@@ -81,7 +81,7 @@ class ZipCodeScraper(object):
 
 
 def main():
-    # Uncomment the following to scrape the USPS site.
+    # Uncomment the following to scrape the USPS site...
     # scraper = ZipCodeScraper('city_state.csv')
     # scraper.save_html()
 
