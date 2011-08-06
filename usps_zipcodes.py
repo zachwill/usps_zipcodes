@@ -11,15 +11,9 @@ import os
 import re
 import csv
 from urllib2 import urlopen
+
+import lxml.html as lh
 from mechanize import ParseResponse
-
-
-def usps_form():
-    """Return the USPS ZIP Code look-up form."""
-    url = "http://zip4.usps.com/zip4/citytown.jsp"
-    forms = ParseResponse(urlopen(url))
-    form = forms[0]
-    return form
 
 
 def fill_out_form(form, **kwargs):
@@ -48,6 +42,13 @@ class ZipCodeScraper(object):
         else:
             self.cities = None
 
+    def usps_form(self):
+        """Return the USPS ZIP Code look-up form."""
+        url = "http://zip4.usps.com/zip4/citytown.jsp"
+        forms = ParseResponse(urlopen(url))
+        form = forms[0]
+        return form
+
     def city_state_list(self, csv_file):
         """
         Create a list of dictionaries from a CSV file of city and state
@@ -63,7 +64,7 @@ class ZipCodeScraper(object):
         a directory. The default directory for saving the HTML pages is `html`.
         """
         cities = self.cities
-        form = usps_form()
+        form = self.usps_form()
         if not os.path.exists(directory):
             os.mkdir(directory)
         for index, city in enumerate(cities):
@@ -80,10 +81,63 @@ class ZipCodeScraper(object):
             f.write(data)
 
 
+class ZipCodeParser(object):
+    """
+    Look through a directory of HTML pages scraped from the USPS website and
+    parse the pages for actual ZIP Codes.
+    """
+
+    def __init__(self, directory=None, filter_results=True):
+        self.directory = directory
+        self.filter_results = filter_results
+
+    def find_html_pages(self, directory='html'):
+        """
+        Find the HTML pages that are saved in a given directory -- by default
+        that directory is `html`.
+        """
+        for root, dirs, files in os.walk(directory):
+            return [os.path.join(root, f) for f in files
+                    if f.endswith('.html')]
+
+    def scrape_zip_codes(self, document):
+        """Scrape a given USPS ZIP Code web page with the lxml.html module."""
+        html = lh.fromstring(document)
+        td_list = html.cssselect('td.main')
+        zip_codes = (td.text.strip() for td in td_list)
+        return self.filter_zip_codes(zip_codes)
+
+    def filter_zip_codes(self, zip_codes):
+        """
+        This function filters the ZIP Codes -- I specifically am not looking for
+        ZIP Codes with a long length, because those are only used for PO Boxes.
+        """
+        if not self.filter_results:
+            return list(zip_codes)
+        check_length = lambda text: len(text) < 15
+        return filter(check_length, zip_codes)
+
+    def parse_all(self, directory=None):
+        """Parse all the HTML pages in a given directory for ZIP Codes."""
+        if not directory:
+            directory = self.directory
+        all_zip_codes = []
+        files = self.find_html_pages(directory)
+        for file_name in files:
+            with open(file_name) as f:
+                document = f.read()
+            zip_codes = self.scrape_zip_codes(document)
+            all_zip_codes.extend(zip_codes)
+        return all_zip_codes
+
+
 def main():
     # Uncomment the following to scrape the USPS site...
     # scraper = ZipCodeScraper('city_state.csv')
     # scraper.save_html()
+    parser = ZipCodeParser('html')
+    zip_codes = parser.parse_all()
+    print zip_codes
 
 
 if __name__ == '__main__':
