@@ -131,13 +131,23 @@ class ZipCodeParser(object):
         return all_zip_codes
 
 
+def save_zip_codes(file_name, zip_codes):
+    """Write the obtained ZIP Codes to a file."""
+    with open(file_name, 'w') as f:
+        # For some reason writelines writes out just a blob
+        # of text rather than an individual line.
+        for line in zip_codes:
+            f.write(line)
+            f.write('\n')
+
+
 def main():
     # Uncomment the following to scrape the USPS site...
     # scraper = ZipCodeScraper('city_state.csv')
     # scraper.save_html()
     parser = ZipCodeParser('html')
     zip_codes = parser.parse_all()
-    print zip_codes
+    save_zip_codes('zip_code_list.txt', zip_codes)
 
 
 if __name__ == '__main__':
